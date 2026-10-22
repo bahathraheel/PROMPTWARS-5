@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 
 function getApiKey()   { return process.env.GEMINI_API_KEY  || ''; }
-function getModelName(){ return process.env.GEMINI_MODEL    || 'gemini-3.8-flash'; }
+function getModelName(){ return process.env.GEMINI_MODEL    || 'gemini-1.5-flash'; }
 function getMaxTokens(){ return Number(process.env.GEMINI_MAX_TOKENS) || 8192; }
 
 let genAI = null;

@@ -1,5 +1,14 @@
 import axios, { type AxiosError } from 'axios';
 import type { AIEventPlan } from '../../../shared/types/index';
+import {
+  isClientAIConfigured,
+  clientGenerateEventPlan,
+  clientSendChatMessage,
+  clientSuggestThemes,
+  clientOptimizeBudget,
+  clientGenerateChecklist,
+  clientDraftVendorEmail,
+} from './geminiClient';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
@@ -84,8 +93,26 @@ function extractError(err: unknown): string {
  * Check if the AI service is configured and available.
  */
 export async function checkAIStatus(): Promise<AIStatus> {
-  const { data } = await api.get<{ success: boolean; data: AIStatus }>('/api/ai/status');
-  return data.data;
+  try {
+    const { data } = await api.get<{ success: boolean; data: AIStatus }>('/api/ai/status');
+    if (data?.data?.configured) return data.data;
+  } catch {
+    // Backend not running / unreachable
+  }
+
+  if (isClientAIConfigured()) {
+    return {
+      configured: true,
+      model: import.meta.env.VITE_GEMINI_MODEL || 'gemini-1.5-flash',
+      message: 'Gemini AI ready',
+    };
+  }
+
+  return {
+    configured: false,
+    model: null,
+    message: 'Gemini API key not configured. Add VITE_GEMINI_API_KEY in Vercel.',
+  };
 }
 
 /**
@@ -99,6 +126,9 @@ export async function generateEventPlan(eventData: Record<string, unknown>): Pro
     );
     return data.data;
   } catch (err) {
+    if (isClientAIConfigured()) {
+      return clientGenerateEventPlan(eventData);
+    }
     throw new Error(extractError(err));
   }
 }
@@ -119,6 +149,9 @@ export async function sendChatMessage(
     });
     return data.data;
   } catch (err) {
+    if (isClientAIConfigured()) {
+      return clientSendChatMessage(message, history, eventContext);
+    }
     throw new Error(extractError(err));
   }
 }
@@ -134,6 +167,9 @@ export async function suggestThemes(eventData: Record<string, unknown>): Promise
     );
     return data.data;
   } catch (err) {
+    if (isClientAIConfigured()) {
+      return clientSuggestThemes(eventData);
+    }
     throw new Error(extractError(err));
   }
 }
@@ -152,6 +188,9 @@ export async function optimizeBudget(
     );
     return data.data;
   } catch (err) {
+    if (isClientAIConfigured()) {
+      return clientOptimizeBudget(eventData, currentBudget);
+    }
     throw new Error(extractError(err));
   }
 }
@@ -167,6 +206,9 @@ export async function generateChecklist(eventData: Record<string, unknown>): Pro
     );
     return data.data;
   } catch (err) {
+    if (isClientAIConfigured()) {
+      return clientGenerateChecklist(eventData);
+    }
     throw new Error(extractError(err));
   }
 }
@@ -186,6 +228,9 @@ export async function draftVendorEmail(
     );
     return data.data;
   } catch (err) {
+    if (isClientAIConfigured()) {
+      return clientDraftVendorEmail(vendor, event, customRequest);
+    }
     throw new Error(extractError(err));
   }
 }
