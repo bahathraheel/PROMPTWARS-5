@@ -1,0 +1,34 @@
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Dependencies
+node_modules/
+dist/
+
+# Environment & Secrets — NEVER COMMIT
+.env
+.env.local
+.env.development
+.env.production
+.env.staging
+
+# Firebase service accounts
+serviceAccountKey.json
+*serviceAccount*.json
+firebase-adminsdk*.json
+
+# Private keys
+*.pem
+*.key
+*.p12
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.sw?

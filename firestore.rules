@@ -1,0 +1,80 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+
+    // ── Users ──────────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // ── Events ─────────────────────────────────────────────────────────────────
+    match /events/{eventId} {
+      allow list:   if isAuth();
+      allow get:    if isAuth() && resource.data.userId == request.auth.uid;
+      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuth() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuth() && resource.data.userId == request.auth.uid;
+    }
+
+    // ── Budget Categories ──────────────────────────────────────────────────────
+    match /budgetCategories/{catId} {
+      allow list:   if isAuth();
+      allow get:    if isAuth() && resource.data.userId == request.auth.uid;
+      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuth() && resource.data.userId == request.auth.uid;
+    }
+
+    // ── Expenses ───────────────────────────────────────────────────────────────
+    match /expenses/{expId} {
+      allow list:   if isAuth();
+      allow get:    if isAuth() && resource.data.userId == request.auth.uid;
+      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuth() && resource.data.userId == request.auth.uid;
+    }
+
+    // ── Tasks ──────────────────────────────────────────────────────────────────
+    match /tasks/{taskId} {
+      allow list:   if isAuth();
+      allow get:    if isAuth() && resource.data.userId == request.auth.uid;
+      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuth() && resource.data.userId == request.auth.uid;
+    }
+
+    // ── Vendors ────────────────────────────────────────────────────────────────
+    match /vendors/{vendorId} {
+      allow list:   if isAuth();
+      allow get:    if isAuth() && resource.data.userId == request.auth.uid;
+      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuth() && resource.data.userId == request.auth.uid;
+    }
+
+    // ── Guests ─────────────────────────────────────────────────────────────────
+    match /guests/{guestId} {
+      allow list:   if isAuth();
+      allow get:    if isAuth() && resource.data.userId == request.auth.uid;
+      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuth() && resource.data.userId == request.auth.uid;
+    }
+
+    // ── AI Conversations ───────────────────────────────────────────────────────
+    match /aiConversations/{convId} {
+      allow list:   if isAuth();
+      allow get:    if isAuth() && resource.data.userId == request.auth.uid;
+      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuth() && resource.data.userId == request.auth.uid;
+    }
+
+    // ── Deny everything else ───────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
