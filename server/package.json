@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "description": "PLANEN AI - Backend API Server",
   "main": "src/index.js",
+  "engines": { "node": ">=20" },
   "type": "module",
   "scripts": {
+    "build": "echo 'No build step required — plain JS server'",
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "test": "node --experimental-vm-modules node_modules/.bin/vitest run",

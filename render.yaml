@@ -1,0 +1,18 @@
+services:
+  # ── Backend API (Node.js / Express) ─────────────────────────────
+  - type: web
+    name: planen-ai-server
+    runtime: node
+    # Render will cd into this directory before running any commands
+    rootDir: server
+    # Plain JS — no TypeScript compilation or Vite needed on the server
+    buildCommand: npm install
+    startCommand: node src/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Set the remaining secrets in the Render dashboard (not here):
+      # GEMINI_API_KEY, GEMINI_MODEL, GEMINI_MAX_TOKENS,
+      # FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY,
+      # FIREBASE_STORAGE_BUCKET, ALLOWED_ORIGINS,
+      # RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX, AI_RATE_LIMIT_MAX
