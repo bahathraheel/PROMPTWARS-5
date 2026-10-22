@@ -9,7 +9,12 @@ import type {
 } from './aiService';
 
 const getClientApiKey = () => import.meta.env.VITE_GEMINI_API_KEY || '';
-const getClientModelName = () => import.meta.env.VITE_GEMINI_MODEL || 'gemini-1.5-flash';
+const getClientModelName = () => {
+  const raw = (import.meta.env.VITE_GEMINI_MODEL || 'gemini-1.5-flash').trim();
+  // Sanitize Unicode dashes (en-dash, em-dash, etc.) into ASCII hyphens
+  const sanitized = raw.replace(/[\u2010-\u2015\u2212]/g, '-');
+  return sanitized || 'gemini-1.5-flash';
+};
 
 export function isClientAIConfigured(): boolean {
   const key = getClientApiKey();

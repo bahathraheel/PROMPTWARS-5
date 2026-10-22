@@ -1,7 +1,10 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 
 function getApiKey()   { return process.env.GEMINI_API_KEY  || ''; }
-function getModelName(){ return process.env.GEMINI_MODEL    || 'gemini-1.5-flash'; }
+function getModelName(){
+  const raw = (process.env.GEMINI_MODEL || 'gemini-1.5-flash').trim();
+  return raw.replace(/[\u2010-\u2015\u2212]/g, '-') || 'gemini-1.5-flash';
+}
 function getMaxTokens(){ return Number(process.env.GEMINI_MAX_TOKENS) || 8192; }
 
 let genAI = null;
