@@ -27,6 +27,18 @@ export function isFirebaseConfigured(): boolean {
   );
 }
 
+// Log configuration status in console for easy debugging
+if (typeof window !== 'undefined') {
+  const maskedKey = firebaseConfig.apiKey
+    ? `${firebaseConfig.apiKey.slice(0, 10)}...${firebaseConfig.apiKey.slice(-5)}`
+    : 'NOT SET';
+  console.log(`[Firebase Init] Project: ${firebaseConfig.projectId || 'NOT SET'} | Auth Domain: ${firebaseConfig.authDomain || 'NOT SET'} | Key: ${maskedKey}`);
+  
+  if (firebaseConfig.apiKey && firebaseConfig.apiKey.endsWith('R6h9U')) {
+    console.error('[Firebase Init] ERROR: VITE_FIREBASE_API_KEY appears to be set to your Google Maps API key instead of your Firebase Web API key! Please check your Vercel Environment Variables.');
+  }
+}
+
 // ─── Lazy singletons — nothing runs at import time ────────────────────────────
 let _app:            FirebaseApp          | null = null;
 let _auth:           Auth                 | null = null;
