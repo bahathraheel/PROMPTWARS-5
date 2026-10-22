@@ -35,10 +35,16 @@ function mapAuthError(error: unknown): AuthError {
     'auth/invalid-credential':      'Invalid email or password.',
     'auth/operation-not-allowed':   'Email/Password sign-in not enabled in Firebase Console.',
     'auth/unauthorized-domain':     'Add localhost to Firebase authorized domains.',
-    'auth/invalid-api-key':         'Invalid Firebase API key in client/.env.local.',
+    'auth/invalid-api-key':         'Invalid Firebase API key in environment variables.',
     'auth/popup-blocked':           'Popup blocked. Please allow popups for this site.',
     'not-configured':               'Firebase credentials not configured.',
   };
+  if (code.includes('identitytoolkit') || code.includes('blocked') || code.includes('projectconfigservice')) {
+    return {
+      code,
+      message: 'Firebase Auth is blocked by Google Cloud API key restrictions. Enable Identity Toolkit API in Google Cloud Console Credentials.',
+    };
+  }
   return { code, message: messages[code] || `Auth error (${code}). Please try again.` };
 }
 
