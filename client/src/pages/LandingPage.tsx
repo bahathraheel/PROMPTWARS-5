@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Sparkles, Calendar, DollarSign, Users, CheckSquare,
   ShoppingBag, Palette, ChevronRight, Star, ArrowRight,
-  Menu, X, Bot, Zap, Shield, Globe, Play
+  Menu, X, Bot, Zap, Shield, Play
 } from 'lucide-react';
 
 const NAV_LINKS = [

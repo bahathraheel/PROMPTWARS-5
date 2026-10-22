@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // ─── Helper / Utility Tests ────────────────────────────────────────────────────
 import {
-  formatDate, formatRelative, daysUntil, formatCurrency,
+  formatDate, daysUntil, formatCurrency,
   formatNumber, percentage, clamp, truncate, getEventTypeLabel,
   getStatusColor, getPriorityColor, getInitials, isValidEmail,
   generateId, sum, objectsToCSV, sanitizeText, calcCategoryBalance,

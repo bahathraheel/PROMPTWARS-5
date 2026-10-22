@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
-  Calendar, DollarSign, Users, MapPin, Edit2, Trash2,
+  Calendar, DollarSign, Users, MapPin, Trash2,
   Bot, CheckSquare, ShoppingBag, Palette, FileText,
   Clock, ArrowRight, Sparkles
 } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { getEvent, deleteEvent } from '../../services/firestoreService';
-import type { Event } from '../../../shared/types/index';
+import type { Event } from '../../../../shared/types/index';
 import { formatDate, formatCurrency, daysUntil, getEventTypeLabel, getStatusColor } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 

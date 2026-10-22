@@ -1,13 +1,13 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { Download, FileText, Printer, Users, DollarSign, Calendar, ShoppingBag } from 'lucide-react';
+import { Download, Printer, Users, DollarSign, Calendar, ShoppingBag } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  getEvent, getBudgetCategories, getExpenses,
+  getEvent, getBudgetCategories,
   getTasks, getVendors, getGuests
 } from '../../services/firestoreService';
-import type { Event, BudgetCategory, Task, Vendor, Guest } from '../../../shared/types/index';
+import type { Event, BudgetCategory, Task, Vendor, Guest } from '../../../../shared/types/index';
 import { formatDate, formatCurrency, sum, downloadFile, objectsToCSV } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 

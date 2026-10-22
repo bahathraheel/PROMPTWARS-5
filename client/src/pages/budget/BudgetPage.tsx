@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Plus, Edit2, Trash2, DollarSign, AlertTriangle, Download, Bot, X, Check } from 'lucide-react';
+import { Plus, Trash2, DollarSign, AlertTriangle, Download, Bot, X, Check } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { getEvent, getBudgetCategories, addBudgetCategory, updateBudgetCategory, deleteBudgetCategory, getExpenses, addExpense, deleteExpense } from '../../services/firestoreService';
 import { optimizeBudget } from '../../services/aiService';
-import type { Event, BudgetCategory, Expense } from '../../../shared/types/index';
+import type { Event, BudgetCategory, Expense } from '../../../../shared/types/index';
 import { formatCurrency, percentage, sum, downloadFile, objectsToCSV } from '../../utils/helpers';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import toast from 'react-hot-toast';
@@ -372,7 +372,7 @@ export default function BudgetPage() {
                     <Pie data={chartData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} dataKey="value" stroke="none">
                       {chartData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                     </Pie>
-                    <Tooltip formatter={(val: number) => formatCurrency(val, event?.currency)} />
+                    <Tooltip formatter={(val) => formatCurrency(typeof val === 'number' ? val : Number(val) || 0, event?.currency)} />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>

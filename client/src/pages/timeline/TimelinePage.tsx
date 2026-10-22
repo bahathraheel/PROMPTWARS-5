@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Plus, Trash2, Check, Calendar, Clock, Bot, Filter, X } from 'lucide-react';
+import { Plus, Trash2, Check, Calendar, Clock, Bot, X } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { getEvent, getTasks, addTask, updateTask, deleteTask } from '../../services/firestoreService';
 import { generateChecklist } from '../../services/aiService';
-import type { Event, Task, TaskPriority } from '../../../shared/types/index';
+import type { Event, Task, TaskPriority } from '../../../../shared/types/index';
 import { formatDate, daysUntil, getPriorityColor } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 
@@ -27,9 +27,9 @@ export default function TimelinePage() {
     if (!eventId || !user) return;
     Promise.all([getEvent(eventId), getTasks(eventId)]).then(([ev, ts]) => {
       setEvent(ev);
-      setTasks(ts.sort((a, b) => {
-        const pOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
-        return (pOrder[a.priority] || 3) - (pOrder[b.priority] || 3);
+      setTasks(ts.sort((a: Task, b: Task) => {
+        const pOrder: Record<TaskPriority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+        return pOrder[a.priority] - pOrder[b.priority];
       }));
       setLoading(false);
     });

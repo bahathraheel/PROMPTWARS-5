@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Plus, Trash2, Search, Phone, Mail, Globe, Bot, X, Check, ExternalLink } from 'lucide-react';
+import { Plus, Trash2, Search, Phone, Mail, Bot, X, Check } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { getEvent, getVendors, addVendor, updateVendor, deleteVendor } from '../../services/firestoreService';
 import { draftVendorEmail } from '../../services/aiService';
-import type { Event, Vendor, VendorCategory, BookingStatus } from '../../../shared/types/index';
+import type { Event, Vendor, VendorCategory, BookingStatus } from '../../../../shared/types/index';
 import { formatCurrency } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 
@@ -119,10 +119,10 @@ export default function VendorsPage() {
     }
   };
 
-  const getCategoryEmoji = (cat: VendorCategory) => ({
+  const getCategoryEmoji = (cat: VendorCategory): string => ({
     venue: '🏛️', catering: '🍽️', decor: '🌸', photography: '📷',
     makeup: '💄', entertainment: '🎶', transportation: '🚗', other: '📦',
-  }[cat] || '📦');
+  } as Record<VendorCategory, string>)[cat] ?? '📦';
 
   if (loading) {
     return <AppLayout eventId={eventId} title="Vendors"><div className="page-content">{[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 80, borderRadius: 12, marginBottom: 12 }} />)}</div></AppLayout>;
@@ -172,21 +172,21 @@ export default function VendorsPage() {
                   <label className="form-label" style={{ fontSize: '0.7rem' }}>{f.label}</label>
                   <input id={f.id} className="input" type={f.type} placeholder={f.placeholder}
                     value={f.key === 'estimatedQuote' ? (newVendor[f.key as keyof Vendor] as number || '') : (newVendor[f.key as keyof Vendor] as string || '')}
-                    onChange={e => setNewVendor(p => ({ ...p, [f.key]: f.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value }))}
+                    onChange={e => setNewVendor((p: Partial<Vendor>) => ({ ...p, [f.key]: f.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value }))}
                   />
                 </div>
               ))}
               <div className="form-group" style={{ gap: 4 }}>
                 <label className="form-label" style={{ fontSize: '0.7rem' }}>Category</label>
                 <div className="select-wrapper">
-                  <select className="select" value={newVendor.category} onChange={e => setNewVendor(p => ({ ...p, category: e.target.value as VendorCategory }))} id="new-vendor-cat">
+                  <select className="select" value={newVendor.category} onChange={e => setNewVendor((p: Partial<Vendor>) => ({ ...p, category: e.target.value as VendorCategory }))} id="new-vendor-cat">
                     {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
               </div>
               <div className="form-group" style={{ gap: 4 }}>
                 <label className="form-label" style={{ fontSize: '0.7rem' }}>Notes</label>
-                <input className="input" placeholder="Any notes..." value={newVendor.notes || ''} onChange={e => setNewVendor(p => ({ ...p, notes: e.target.value }))} id="new-vendor-notes" />
+                <input className="input" placeholder="Any notes..." value={newVendor.notes || ''} onChange={e => setNewVendor((p: Partial<Vendor>) => ({ ...p, notes: e.target.value }))} id="new-vendor-notes" />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: '1rem' }}>

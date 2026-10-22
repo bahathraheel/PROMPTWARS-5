@@ -1,5 +1,5 @@
 import axios, { type AxiosError } from 'axios';
-import type { AIEventPlan } from '../../shared/types/index';
+import type { AIEventPlan } from '../../../shared/types/index';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 

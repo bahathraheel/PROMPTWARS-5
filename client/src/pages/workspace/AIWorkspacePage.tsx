@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { Send, Sparkles, RefreshCw, Bot, User as UserIcon, AlertCircle, CheckCircle } from 'lucide-react';
+import { Send, Sparkles, Bot, User as UserIcon, AlertCircle, CheckCircle } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { getEvent, getAIConversation, saveAIConversation } from '../../services/firestoreService';
 import { checkAIStatus, generateEventPlan, sendChatMessage } from '../../services/aiService';
-import type { Event, AIEventPlan } from '../../../shared/types/index';
+import type { Event, AIEventPlan } from '../../../../shared/types/index';
 import { formatCurrency, formatDate } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 
@@ -122,7 +122,7 @@ export default function AIWorkspacePage() {
       saveAIConversation(
         eventId,
         user.uid,
-        msgs.map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp }))
+        msgs.map(m => ({ id: m.id, role: m.role, content: m.content, timestamp: m.timestamp }))
       ).catch(() => {}); // silently fail — chat still works locally
     }, 1500); // save 1.5s after last message
   }, [eventId, user]);

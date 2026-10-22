@@ -187,7 +187,7 @@ export function generateId(): string {
  * Sum an array of numbers safely.
  */
 export function sum(arr: (number | undefined | null)[]): number {
-  return arr.reduce((acc, val) => acc + (val ?? 0), 0);
+  return arr.reduce<number>((acc, val) => acc + (val ?? 0), 0);
 }
 
 /**

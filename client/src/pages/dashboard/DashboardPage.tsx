@@ -1,22 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus, Search, Calendar, DollarSign, Users, CheckSquare,
-  Sparkles, ArrowRight, Clock, TrendingUp, Bot, Filter,
+  Sparkles, ArrowRight, Clock, Bot,
   LayoutDashboard
 } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { subscribeToUserEvents } from '../../services/firestoreService';
-import type { Event } from '../../../shared/types/index';
+import type { Event } from '../../../../shared/types/index';
 import {
   formatDate, formatCurrency, daysUntil,
-  getEventTypeLabel, getStatusColor, getInitials
+  getStatusColor
 } from '../../utils/helpers';
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');

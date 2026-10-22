@@ -1,8 +1,10 @@
+/// <reference types="vitest/globals" />
 /**
  * Vitest global setup file.
  * Runs before each test file.
  */
 import '@testing-library/jest-dom';
+import { beforeAll, afterAll } from 'vitest';
 
 // Polyfill crypto.randomUUID for test environment
 if (!globalThis.crypto) {

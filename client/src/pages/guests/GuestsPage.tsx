@@ -1,19 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Plus, Trash2, Search, Download, X, Check, Users } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { getEvent, getGuests, addGuest, updateGuest, deleteGuest } from '../../services/firestoreService';
-import type { Event, Guest, RSVPStatus, GuestGroup } from '../../../shared/types/index';
+import type { Event, Guest, RSVPStatus, GuestGroup } from '../../../../shared/types/index';
 import { downloadFile, objectsToCSV } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 
-const RSVP_COLORS: Record<RSVPStatus, string> = {
-  pending:   'badge-neutral',
-  confirmed: 'badge-success',
-  declined:  'badge-error',
-  maybe:     'badge-warning',
-};
 const GROUPS: GuestGroup[] = ['family', 'friends', 'colleagues', 'other'];
 
 export default function GuestsPage() {
@@ -182,20 +176,20 @@ export default function GuestsPage() {
                   <label className="form-label" style={{ fontSize: '0.7rem' }}>{f.label}</label>
                   <input id={f.id} className="input" type={f.type} placeholder={f.placeholder}
                     value={newGuest[f.key as keyof Guest] as string || ''}
-                    onChange={e => setNewGuest(p => ({ ...p, [f.key]: e.target.value }))} />
+                    onChange={e => setNewGuest((p: Partial<Guest>) => ({ ...p, [f.key]: e.target.value }))} />
                 </div>
               ))}
               <div className="form-group" style={{ gap: 4 }}>
                 <label className="form-label" style={{ fontSize: '0.7rem' }}>Group</label>
                 <div className="select-wrapper">
-                  <select className="select" value={newGuest.group} onChange={e => setNewGuest(p => ({ ...p, group: e.target.value as GuestGroup }))} id="new-guest-group">
+                  <select className="select" value={newGuest.group} onChange={e => setNewGuest((p: Partial<Guest>) => ({ ...p, group: e.target.value as GuestGroup }))} id="new-guest-group">
                     {GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
                   </select>
                 </div>
               </div>
               <div className="form-group" style={{ gap: 4 }}>
                 <label className="form-label" style={{ fontSize: '0.7rem' }}>Plus Ones</label>
-                <input className="input" type="number" min="0" max="10" value={newGuest.plusOnes || 0} onChange={e => setNewGuest(p => ({ ...p, plusOnes: parseInt(e.target.value) || 0 }))} id="new-guest-plus" />
+                <input className="input" type="number" min="0" max="10" value={newGuest.plusOnes || 0} onChange={e => setNewGuest((p: Partial<Guest>) => ({ ...p, plusOnes: parseInt(e.target.value) || 0 }))} id="new-guest-plus" />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: '1rem' }}>

@@ -26,27 +26,26 @@ import type {
   Vendor,
   Guest,
   AIConversation,
-} from '../../shared/types/index';
+} from '../../../shared/types/index';
 
 // ─── Type helpers ─────────────────────────────────────────────────────────────
 
 type WithoutMeta<T> = Omit<T, 'id' | 'createdAt' | 'updatedAt'>;
-type CollectionName =
-  | 'events'
-  | 'budgetCategories'
-  | 'expenses'
-  | 'tasks'
-  | 'vendors'
-  | 'guests'
-  | 'aiConversations';
+
 
 function toData(snap: { id: string; data: () => Record<string, unknown> }) {
   const data = snap.data();
+  const asTimestamp = (v: unknown): string => {
+    if (v != null && typeof (v as { toDate?: unknown }).toDate === 'function') {
+      return (v as { toDate: () => Date }).toDate().toISOString();
+    }
+    return new Date().toISOString();
+  };
   return {
     ...data,
     id: snap.id,
-    createdAt: data.createdAt?.toDate?.()?.toISOString() ?? new Date().toISOString(),
-    updatedAt: data.updatedAt?.toDate?.()?.toISOString() ?? new Date().toISOString(),
+    createdAt: asTimestamp(data.createdAt),
+    updatedAt: asTimestamp(data.updatedAt),
   };
 }
 
@@ -75,7 +74,7 @@ export async function createEvent(userId: string, data: Omit<WithoutMeta<Event>,
 
 
 export async function updateEvent(eventId: string, data: Partial<Event>): Promise<void> {
-  const { id, createdAt, ...rest } = data as Partial<Event> & { id?: string; createdAt?: string };
+  const { id: _id, createdAt: _createdAt, ...rest } = data as Partial<Event> & { id?: string; createdAt?: string };
   await updateDoc(doc(getDb(), 'events', eventId), {
     ...rest,
     updatedAt: serverTimestamp(),

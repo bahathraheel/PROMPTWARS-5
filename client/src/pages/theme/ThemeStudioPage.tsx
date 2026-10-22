@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { RefreshCw, Heart, Palette, Sparkles, AlertCircle } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { getEvent } from '../../services/firestoreService';
 import { suggestThemes } from '../../services/aiService';
-import type { Event } from '../../../shared/types/index';
+import type { Event } from '../../../../shared/types/index';
 import type { ThemeSuggestions } from '../../services/aiService';
 import toast from 'react-hot-toast';
 

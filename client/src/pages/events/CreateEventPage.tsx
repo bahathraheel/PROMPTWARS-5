@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,16 +18,16 @@ const schema = z.object({
   city:          z.string().optional(),
   venuePreference: z.string().optional(),
   isOutdoor:     z.boolean().optional(),
-  guestCount:    z.number({ invalid_type_error: 'Enter a valid number' }).int().min(1, 'At least 1 guest').max(100000),
-  budget:        z.number({ invalid_type_error: 'Enter a valid budget' }).min(0, 'Budget cannot be negative'),
-  currency:      z.string().default('USD'),
+  guestCount:    z.number('Enter a valid number').int().min(1, 'At least 1 guest').max(100000),
+  budget:        z.number('Enter a valid budget').min(0, 'Budget cannot be negative'),
+  currency:      z.string(),
   theme:         z.string().optional(),
   atmosphere:    z.string().optional(),
   dietaryPreferences: z.array(z.string()).optional(),
   accessibilityNeeds: z.string().optional(),
   culturalRequirements: z.string().optional(),
   planningStyle: z.enum(['budget_friendly', 'balanced', 'premium']),
-  status:        z.enum(['planning','confirmed','in_progress','completed','cancelled']).default('planning'),
+  status:        z.enum(['planning','confirmed','in_progress','completed','cancelled']),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -67,7 +67,6 @@ export default function CreateEventPage() {
   const {
     register, handleSubmit, control, watch, trigger,
     formState: { errors },
-    getValues,
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -105,6 +104,7 @@ export default function CreateEventPage() {
     try {
       const eventId = await createEvent(user.uid, {
         ...data,
+        city: data.city || '',
         location: data.city || '',
         colors: [],
       });
