@@ -1,11 +1,15 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
-import { Send, Sparkles, Bot, User as UserIcon, AlertCircle, CheckCircle } from 'lucide-react';
+import { useParams, Link } from 'react-router-dom';
+import { Send, Sparkles, Bot, User as UserIcon, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { useAuth } from '../../contexts/AuthContext';
-import { getEvent, getAIConversation, saveAIConversation } from '../../services/firestoreService';
+import {
+  getEvent, getAIConversation, saveAIConversation,
+  saveEventPlan, getBudgetCategories, addBudgetCategory,
+  addTask, addVendor
+} from '../../services/firestoreService';
 import { checkAIStatus, generateEventPlan, sendChatMessage } from '../../services/aiService';
-import type { Event, AIEventPlan } from '../../../../shared/types/index';
+import type { Event, AIEventPlan, VendorCategory, TaskPriority } from '../../../../shared/types/index';
 import { formatCurrency, formatDate } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 
@@ -27,13 +31,11 @@ function renderMessageContent(content: string): React.ReactNode {
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     try {
       const parsed = JSON.parse(trimmed);
-      // If it has a summary field, show that
       if (parsed.summary) {
         return renderMarkdown(parsed.summary + (parsed.assumptions?.length
           ? '\n\n**Key assumptions:**\n' + parsed.assumptions.slice(0, 3).map((a: string) => `• ${a}`).join('\n')
           : ''));
       }
-      // Otherwise show a generic message
       return renderMarkdown('✅ The AI generated your event plan! Switch to the **Plan** tab on the right to view the full breakdown.');
     } catch {
       // not valid JSON, fall through to markdown render
@@ -48,7 +50,6 @@ function renderMarkdown(text: string): React.ReactNode {
   return (
     <span style={{ display: 'block' }}>
       {lines.map((line, i) => {
-        // Render **bold** text inline
         const parts = line.split(/(\*\*[^*]+\*\*)/g);
         const rendered = parts.map((part, j) => {
           if (part.startsWith('**') && part.endsWith('**')) {
@@ -74,16 +75,16 @@ export default function AIWorkspacePage() {
   const [messages, setMessages]               = useState<ChatMessage[]>([]);
   const [input, setInput]                     = useState('');
   const [generatingPlan, setGeneratingPlan]   = useState(false);
+  const [importingPlan, setImportingPlan]     = useState(false);
   const [sending, setSending]                 = useState(false);
   const [aiConfigured, setAiConfigured]       = useState<boolean | null>(null);
   const [aiMessage, setAiMessage]             = useState('');
   const [activeTab, setActiveTab]             = useState<'chat' | 'plan' | 'budget' | 'timeline' | 'vendors'>('chat');
   const [loadingChat, setLoadingChat]         = useState(true);
   const chatEndRef = useRef<HTMLDivElement>(null);
-  // Track save debounce
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ─── Load event + AI status + persisted chat ────────────────────────────────
+  // ─── Load event + AI status + persisted chat + persisted plan ───────────────
   useEffect(() => {
     if (!eventId || !user) return;
     setLoadingChat(true);
@@ -96,6 +97,11 @@ export default function AIWorkspacePage() {
       setEvent(ev);
       setAiConfigured(status.configured);
       setAiMessage(status.message);
+
+      // Restore persisted plan if saved
+      if (ev?.aiPlan) {
+        setPlan(ev.aiPlan);
+      }
 
       // Restore persisted chat messages
       if (convo && Array.isArray(convo.messages) && convo.messages.length > 0) {
@@ -123,16 +129,15 @@ export default function AIWorkspacePage() {
         eventId,
         user.uid,
         msgs.map(m => ({ id: m.id, role: m.role, content: m.content, timestamp: m.timestamp }))
-      ).catch(() => {}); // silently fail — chat still works locally
-    }, 1500); // save 1.5s after last message
+      ).catch(() => {});
+    }, 1500);
   }, [eventId, user]);
 
   // ─── Generate Plan ───────────────────────────────────────────────────────────
   const handleGeneratePlan = async () => {
-    if (!event) return;
+    if (!event || !eventId) return;
     setGeneratingPlan(true);
 
-    // Show "thinking" message immediately for better UX
     const thinkingMsg: ChatMessage = {
       id: 'thinking',
       role: 'model',
@@ -144,11 +149,12 @@ export default function AIWorkspacePage() {
     try {
       const generatedPlan = await generateEventPlan(event as unknown as Record<string, unknown>);
       setPlan(generatedPlan);
+      saveEventPlan(eventId, generatedPlan).catch(err => console.error('Failed to persist plan:', err));
 
       const planMsg: ChatMessage = {
         id: Date.now().toString(),
         role: 'model',
-        content: `✅ I've generated a complete event plan for **${event.name}**! 🎉\n\n${generatedPlan.summary}\n\n**Top action items:**\n${generatedPlan.actionItems?.slice(0, 3).map((a: { title: string }) => `• ${a.title}`).join('\n') || ''}\n\nFeel free to ask me anything about the plan or switch to the Plan/Budget/Timeline tabs!`,
+        content: `✅ I've generated a complete event plan for **${event.name}**! 🎉\n\n${generatedPlan.summary}\n\n**Top action items:**\n${generatedPlan.actionItems?.slice(0, 3).map((a: { title: string }) => `• ${a.title}`).join('\n') || ''}\n\nFeel free to ask me anything about the plan or switch to the Plan/Budget/Timeline tabs! You can also click "Apply Plan to Event" to import everything directly into your Budget and Timeline.`,
         timestamp: new Date().toISOString(),
       };
 
@@ -158,13 +164,83 @@ export default function AIWorkspacePage() {
         return updated;
       });
       setActiveTab('plan');
-      toast.success('Event plan generated!');
+      toast.success('Event plan generated and saved!');
     } catch (err: unknown) {
       setMessages(prev => prev.filter(m => m.id !== 'thinking'));
       const e = err as { message?: string };
       toast.error(e?.message || 'Failed to generate plan. Please try again.');
     } finally {
       setGeneratingPlan(false);
+    }
+  };
+
+  // ─── Import AI Plan into Event Tables ───────────────────────────────────────
+  const handleImportPlan = async () => {
+    if (!plan || !eventId || !user) return;
+    setImportingPlan(true);
+    try {
+      let counts = { categories: 0, tasks: 0, vendors: 0 };
+
+      // 1. Categories
+      if (plan.budgetBreakdown && plan.budgetBreakdown.length > 0) {
+        const existingCats = await getBudgetCategories(eventId);
+        const existingNames = new Set(existingCats.map(c => c.name.toLowerCase()));
+        for (const b of plan.budgetBreakdown) {
+          if (!existingNames.has(b.category.toLowerCase())) {
+            await addBudgetCategory({
+              eventId,
+              userId: user.uid,
+              name: b.category,
+              estimatedCost: b.estimatedCost || 0,
+              actualCost: 0,
+              amountPaid: 0,
+            });
+            counts.categories++;
+          }
+        }
+      }
+
+      // 2. Action Items as Tasks
+      if (plan.actionItems && plan.actionItems.length > 0) {
+        for (let i = 0; i < plan.actionItems.length; i++) {
+          const item = plan.actionItems[i];
+          await addTask({
+            eventId,
+            userId: user.uid,
+            title: item.title,
+            priority: (item.priority as TaskPriority) || 'medium',
+            category: item.category || undefined,
+            dueDate: item.dueDate || undefined,
+            completed: false,
+            order: i,
+          });
+          counts.tasks++;
+        }
+      }
+
+      // 3. Vendors
+      if (plan.vendorChecklist && plan.vendorChecklist.length > 0) {
+        for (const v of plan.vendorChecklist) {
+          await addVendor({
+            eventId,
+            userId: user.uid,
+            name: v.name,
+            category: (v.category as VendorCategory) || 'other',
+            estimatedQuote: 0,
+            bookingStatus: 'not_contacted',
+            notes: v.notes || undefined,
+            isAiSuggested: true,
+          });
+          counts.vendors++;
+        }
+      }
+
+      toast.success(`Imported ${counts.categories} categories, ${counts.tasks} tasks, and ${counts.vendors} vendors to your event!`);
+    } catch (err) {
+      console.error('Failed to import plan:', err);
+      toast.error('Failed to apply plan to event.');
+    } finally {
+      setImportingPlan(false);
     }
   };
 
@@ -210,6 +286,20 @@ export default function AIWorkspacePage() {
   const handleQuickPrompt = (prompt: string) => {
     setInput(prompt);
   };
+
+  if (!loadingChat && (!event || (user && event.userId !== user.uid))) {
+    return (
+      <AppLayout title="Event Not Found">
+        <div className="page-content">
+          <div className="empty-state">
+            <h2 className="empty-state__title">Event not found</h2>
+            <p className="empty-state__desc">This event doesn't exist or you don't have access to it.</p>
+            <Link to="/dashboard" className="btn btn-primary"><ArrowLeft size={16} /> Back to Dashboard</Link>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout eventId={eventId} title="AI Workspace">
@@ -400,8 +490,22 @@ export default function AIWorkspacePage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     <div className="alert alert--success">
                       <CheckCircle size={16} />
-                      <div><strong>Plan Generated</strong><br /><span style={{ fontSize: '0.8rem' }}>{plan.generatedAt ? new Date(plan.generatedAt).toLocaleString() : ''}</span></div>
+                      <div>
+                        <strong>Plan Generated & Saved</strong><br />
+                        <span style={{ fontSize: '0.8rem' }}>{plan.generatedAt ? new Date(plan.generatedAt).toLocaleString() : ''}</span>
+                      </div>
                     </div>
+
+                    <button
+                      onClick={handleImportPlan}
+                      disabled={importingPlan}
+                      className="btn btn-primary btn-sm"
+                      style={{ width: '100%', justifyContent: 'center', gap: 8 }}
+                      id="apply-plan-btn"
+                    >
+                      <CheckCircle size={14} /> {importingPlan ? 'Applying...' : 'Apply Plan to Event (Budget & Tasks)'}
+                    </button>
+
                     <div>
                       <h4 style={{ fontWeight: 700, fontSize: '0.875rem', marginBottom: 8 }}>Summary</h4>
                       <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', lineHeight: 1.7 }}>{plan.summary}</p>

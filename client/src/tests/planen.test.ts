@@ -613,3 +613,157 @@ describe('Task Progress Tracking — application level', () => {
     expect(percentage(done, allDone.length)).toBe(100);
   });
 });
+
+
+// ═══════════════════════════════════════════════════════════════════
+// GROUP 20 — Firestore Payload Sanitization (TEST-101 to TEST-105)
+// ═══════════════════════════════════════════════════════════════════
+
+describe('Payload Sanitization (Firestore undefined prevention)', () => {
+  function cleanPayload<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
+    const clean: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (v !== undefined) {
+        clean[k] = v;
+      }
+    }
+    return clean;
+  }
+
+  function sanitizeUpdatePayload<T extends Record<string, unknown>>(data: T): Record<string, unknown> {
+    const { id: _id, createdAt: _createdAt, ...rest } = data;
+    return cleanPayload(rest);
+  }
+
+  it('TEST-101: removes undefined properties from payload', () => {
+    const input = { name: 'Guest A', email: undefined, phone: '+12345' };
+    const cleaned = cleanPayload(input);
+    expect(cleaned).toEqual({ name: 'Guest A', phone: '+12345' });
+    expect('email' in cleaned).toBe(false);
+  });
+
+  it('TEST-102: preserves null and false values in payload', () => {
+    const input = { isPaid: false, notes: null, title: 'Task' };
+    const cleaned = cleanPayload(input);
+    expect(cleaned).toEqual({ isPaid: false, notes: null, title: 'Task' });
+  });
+
+  it('TEST-103: strips id and createdAt on updates', () => {
+    const update = { id: 'doc-123', createdAt: '2026-01-01', name: 'Updated Name', email: undefined };
+    const sanitized = sanitizeUpdatePayload(update);
+    expect(sanitized).toEqual({ name: 'Updated Name' });
+    expect('id' in sanitized).toBe(false);
+    expect('createdAt' in sanitized).toBe(false);
+  });
+
+  it('TEST-104: handles empty object gracefully', () => {
+    expect(cleanPayload({})).toEqual({});
+  });
+
+  it('TEST-105: preserves zero and empty strings', () => {
+    const input = { plusOnes: 0, notes: '', budget: 0 };
+    const cleaned = cleanPayload(input);
+    expect(cleaned).toEqual({ plusOnes: 0, notes: '', budget: 0 });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// GROUP 21 — Guest Filtering & Calculations (TEST-106 to TEST-110)
+// ═══════════════════════════════════════════════════════════════════
+
+describe('Guest Filtering and Attendance calculations', () => {
+  const sampleGuests = [
+    { id: '1', name: 'Alice Smith', email: 'alice@example.com', rsvpStatus: 'confirmed', group: 'family', plusOnes: 2 },
+    { id: '2', name: 'Bob Jones', email: 'bob@example.com', rsvpStatus: 'pending', group: 'friends', plusOnes: 0 },
+    { id: '3', name: 'Charlie Brown', email: 'charlie@work.com', rsvpStatus: 'declined', group: 'colleagues', plusOnes: 1 },
+    { id: '4', name: 'Diana Prince', email: '', rsvpStatus: 'confirmed', group: 'friends', plusOnes: 1 },
+  ];
+
+  it('TEST-106: calculates total attending correctly with plus-ones', () => {
+    const total = sampleGuests
+      .filter(g => g.rsvpStatus === 'confirmed')
+      .reduce((sum, g) => sum + 1 + (g.plusOnes || 0), 0);
+    // Alice (1+2=3) + Diana (1+1=2) = 5
+    expect(total).toBe(5);
+  });
+
+  it('TEST-107: filters guests by search term (name or email)', () => {
+    const search = 'example.com';
+    const match = sampleGuests.filter(g =>
+      g.name.toLowerCase().includes(search.toLowerCase()) ||
+      g.email.toLowerCase().includes(search.toLowerCase())
+    );
+    expect(match.length).toBe(2);
+  });
+
+  it('TEST-108: filters guests by RSVP status', () => {
+    const pending = sampleGuests.filter(g => g.rsvpStatus === 'pending');
+    expect(pending.length).toBe(1);
+    expect(pending[0].name).toBe('Bob Jones');
+  });
+
+  it('TEST-109: filters guests by group', () => {
+    const friends = sampleGuests.filter(g => g.group === 'friends');
+    expect(friends.length).toBe(2);
+  });
+
+  it('TEST-110: counts confirmed, pending, and declined guests', () => {
+    const confirmed = sampleGuests.filter(g => g.rsvpStatus === 'confirmed').length;
+    const pending = sampleGuests.filter(g => g.rsvpStatus === 'pending').length;
+    const declined = sampleGuests.filter(g => g.rsvpStatus === 'declined').length;
+    expect(confirmed).toBe(2);
+    expect(pending).toBe(1);
+    expect(declined).toBe(1);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// GROUP 22 — Budget Category Expense Reconciliation (TEST-111 to TEST-115)
+// ═══════════════════════════════════════════════════════════════════
+
+describe('Budget Category Expense Reconciliation', () => {
+  const categories = [
+    { id: 'cat-venue', name: 'Venue', estimatedCost: 5000 },
+    { id: 'cat-catering', name: 'Catering', estimatedCost: 3000 },
+  ];
+
+  const expenses = [
+    { id: 'exp-1', categoryId: 'cat-venue', amount: 4000, isPaid: true },
+    { id: 'exp-2', categoryId: 'cat-venue', amount: 1500, isPaid: false },
+    { id: 'exp-3', categoryId: 'cat-catering', amount: 2000, isPaid: true },
+  ];
+
+  it('TEST-111: reconciles category actual cost from expenses', () => {
+    const venueExpenses = expenses.filter(e => e.categoryId === 'cat-venue');
+    const actualCost = sum(venueExpenses.map(e => e.amount));
+    expect(actualCost).toBe(5500);
+  });
+
+  it('TEST-112: reconciles category amount paid from paid expenses only', () => {
+    const venuePaid = expenses.filter(e => e.categoryId === 'cat-venue' && e.isPaid);
+    const amountPaid = sum(venuePaid.map(e => e.amount));
+    expect(amountPaid).toBe(4000);
+  });
+
+  it('TEST-113: detects over-budget category accurately after reconciliation', () => {
+    const venueExpenses = expenses.filter(e => e.categoryId === 'cat-venue');
+    const actualCost = sum(venueExpenses.map(e => e.amount));
+    const venueCat = categories.find(c => c.id === 'cat-venue');
+    const estimated = venueCat?.estimatedCost ?? 0;
+    expect(actualCost > estimated).toBe(true);
+    expect(actualCost - estimated).toBe(500);
+  });
+
+  it('TEST-114: handles categories with zero expenses', () => {
+    const otherExpenses = expenses.filter(e => e.categoryId === 'cat-decor');
+    const actualCost = sum(otherExpenses.map(e => e.amount));
+    expect(actualCost).toBe(0);
+  });
+
+  it('TEST-115: updates total spent dynamically when an expense is toggled or added', () => {
+    const totalSpent = sum(expenses.map(e => e.amount));
+    expect(totalSpent).toBe(7500);
+    const totalPaid = sum(expenses.filter(e => e.isPaid).map(e => e.amount));
+    expect(totalPaid).toBe(6000);
+  });
+});

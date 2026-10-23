@@ -26,12 +26,12 @@ import type {
   Vendor,
   Guest,
   AIConversation,
+  AIEventPlan,
 } from '../../../shared/types/index';
 
 // ─── Type helpers ─────────────────────────────────────────────────────────────
 
 type WithoutMeta<T> = Omit<T, 'id' | 'createdAt' | 'updatedAt'>;
-
 
 function toData(snap: { id: string; data: () => Record<string, unknown> }) {
   const data = snap.data();
@@ -52,10 +52,20 @@ function toData(snap: { id: string; data: () => Record<string, unknown> }) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Remove undefined values — Firestore throws invalid-argument for undefined fields */
-function cleanData(obj: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(obj).filter(([, v]) => v !== undefined)
-  );
+function cleanData<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
+  const clean: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined) {
+      clean[k] = v;
+    }
+  }
+  return clean;
+}
+
+/** Sanitize partial updates by stripping ID and createdAt, and cleaning undefineds */
+function sanitizeUpdate<T extends Record<string, unknown>>(data: T): Record<string, unknown> {
+  const { id: _id, createdAt: _createdAt, ...rest } = data;
+  return cleanData(rest as Record<string, unknown>);
 }
 
 // ─── Events ────────────────────────────────────────────────────────────────────
@@ -72,9 +82,8 @@ export async function createEvent(userId: string, data: Omit<WithoutMeta<Event>,
   return ref.id;
 }
 
-
 export async function updateEvent(eventId: string, data: Partial<Event>): Promise<void> {
-  const { id: _id, createdAt: _createdAt, ...rest } = data as Partial<Event> & { id?: string; createdAt?: string };
+  const rest = sanitizeUpdate(data as Record<string, unknown>);
   await updateDoc(doc(getDb(), 'events', eventId), {
     ...rest,
     updatedAt: serverTimestamp(),
@@ -121,16 +130,20 @@ export async function getBudgetCategories(eventId: string): Promise<BudgetCatego
 }
 
 export async function addBudgetCategory(data: WithoutMeta<BudgetCategory>): Promise<string> {
-  const ref = await addDoc(collection(getDb(), 'budgetCategories'), {
+  const ref = await addDoc(collection(getDb(), 'budgetCategories'), cleanData({
     ...data,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  });
+  }));
   return ref.id;
 }
 
 export async function updateBudgetCategory(id: string, data: Partial<BudgetCategory>): Promise<void> {
-  await updateDoc(doc(getDb(), 'budgetCategories', id), { ...data, updatedAt: serverTimestamp() });
+  const rest = sanitizeUpdate(data as Record<string, unknown>);
+  await updateDoc(doc(getDb(), 'budgetCategories', id), {
+    ...rest,
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function deleteBudgetCategory(id: string): Promise<void> {
@@ -146,16 +159,20 @@ export async function getExpenses(eventId: string): Promise<Expense[]> {
 }
 
 export async function addExpense(data: WithoutMeta<Expense>): Promise<string> {
-  const ref = await addDoc(collection(getDb(), 'expenses'), {
+  const ref = await addDoc(collection(getDb(), 'expenses'), cleanData({
     ...data,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  });
+  }));
   return ref.id;
 }
 
 export async function updateExpense(id: string, data: Partial<Expense>): Promise<void> {
-  await updateDoc(doc(getDb(), 'expenses', id), { ...data, updatedAt: serverTimestamp() });
+  const rest = sanitizeUpdate(data as Record<string, unknown>);
+  await updateDoc(doc(getDb(), 'expenses', id), {
+    ...rest,
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function deleteExpense(id: string): Promise<void> {
@@ -165,22 +182,28 @@ export async function deleteExpense(id: string): Promise<void> {
 // ─── Tasks ─────────────────────────────────────────────────────────────────────
 
 export async function getTasks(eventId: string): Promise<Task[]> {
-  const q = query(collection(getDb(), 'tasks'), where('eventId', '==', eventId), orderBy('order', 'asc'));
+  // Query without composite index requirement, and sort in memory
+  const q = query(collection(getDb(), 'tasks'), where('eventId', '==', eventId));
   const snap = await getDocs(q);
-  return snap.docs.map(d => toData(d) as Task);
+  const tasks = snap.docs.map(d => toData(d) as Task);
+  return tasks.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
 export async function addTask(data: WithoutMeta<Task>): Promise<string> {
-  const ref = await addDoc(collection(getDb(), 'tasks'), {
+  const ref = await addDoc(collection(getDb(), 'tasks'), cleanData({
     ...data,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  });
+  }));
   return ref.id;
 }
 
 export async function updateTask(id: string, data: Partial<Task>): Promise<void> {
-  await updateDoc(doc(getDb(), 'tasks', id), { ...data, updatedAt: serverTimestamp() });
+  const rest = sanitizeUpdate(data as Record<string, unknown>);
+  await updateDoc(doc(getDb(), 'tasks', id), {
+    ...rest,
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function deleteTask(id: string): Promise<void> {
@@ -190,7 +213,8 @@ export async function deleteTask(id: string): Promise<void> {
 export function subscribeToTasks(eventId: string, cb: (tasks: Task[]) => void): Unsubscribe {
   const q = query(collection(getDb(), 'tasks'), where('eventId', '==', eventId));
   return onSnapshot(q, (snap) => {
-    cb(snap.docs.map(d => toData(d) as Task));
+    const tasks = snap.docs.map(d => toData(d) as Task);
+    cb(tasks.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
   });
 }
 
@@ -203,16 +227,20 @@ export async function getVendors(eventId: string): Promise<Vendor[]> {
 }
 
 export async function addVendor(data: WithoutMeta<Vendor>): Promise<string> {
-  const ref = await addDoc(collection(getDb(), 'vendors'), {
+  const ref = await addDoc(collection(getDb(), 'vendors'), cleanData({
     ...data,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  });
+  }));
   return ref.id;
 }
 
 export async function updateVendor(id: string, data: Partial<Vendor>): Promise<void> {
-  await updateDoc(doc(getDb(), 'vendors', id), { ...data, updatedAt: serverTimestamp() });
+  const rest = sanitizeUpdate(data as Record<string, unknown>);
+  await updateDoc(doc(getDb(), 'vendors', id), {
+    ...rest,
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function deleteVendor(id: string): Promise<void> {
@@ -228,16 +256,20 @@ export async function getGuests(eventId: string): Promise<Guest[]> {
 }
 
 export async function addGuest(data: WithoutMeta<Guest>): Promise<string> {
-  const ref = await addDoc(collection(getDb(), 'guests'), {
+  const ref = await addDoc(collection(getDb(), 'guests'), cleanData({
     ...data,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  });
+  }));
   return ref.id;
 }
 
 export async function updateGuest(id: string, data: Partial<Guest>): Promise<void> {
-  await updateDoc(doc(getDb(), 'guests', id), { ...data, updatedAt: serverTimestamp() });
+  const rest = sanitizeUpdate(data as Record<string, unknown>);
+  await updateDoc(doc(getDb(), 'guests', id), {
+    ...rest,
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function deleteGuest(id: string): Promise<void> {
@@ -277,4 +309,13 @@ export async function saveAIConversation(
       updatedAt: serverTimestamp(),
     });
   }
+}
+
+// ─── AI Event Plan Persistence ────────────────────────────────────────────────
+
+export async function saveEventPlan(eventId: string, plan: AIEventPlan): Promise<void> {
+  await updateDoc(doc(getDb(), 'events', eventId), {
+    aiPlan: plan,
+    updatedAt: serverTimestamp(),
+  });
 }

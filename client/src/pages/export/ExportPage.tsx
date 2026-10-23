@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams } from 'react-router-dom';
-import { Download, Printer, Users, DollarSign, Calendar, ShoppingBag } from 'lucide-react';
+import { useParams, Link } from 'react-router-dom';
+import { Download, Printer, Users, DollarSign, Calendar, ShoppingBag, ArrowLeft } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -30,14 +30,19 @@ export default function ExportPage() {
       getTasks(eventId),
       getVendors(eventId),
       getGuests(eventId),
-    ]).then(([ev, cats, ts, vs, gs]) => {
-      setEvent(ev);
-      setCategories(cats);
-      setTasks(ts);
-      setVendors(vs);
-      setGuests(gs);
-      setLoading(false);
-    });
+    ])
+      .then(([ev, cats, ts, vs, gs]) => {
+        setEvent(ev);
+        setCategories(cats);
+        setTasks(ts);
+        setVendors(vs);
+        setGuests(gs);
+      })
+      .catch((err) => {
+        console.error('Failed to load export data:', err);
+        toast.error('Failed to load data');
+      })
+      .finally(() => setLoading(false));
   }, [eventId, user]);
 
   const totalBudget = sum(categories.map(c => c.estimatedCost));
@@ -49,25 +54,68 @@ export default function ExportPage() {
   const handlePrint = () => window.print();
 
   const handleExportGuestCSV = () => {
-    const data = guests.map(g => ({ Name: g.name, Email: g.email || '', RSVP: g.rsvpStatus, Group: g.group, 'Plus Ones': g.plusOnes || 0 }));
+    const data = guests.map(g => ({
+      Name: g.name,
+      Email: g.email || '',
+      Phone: g.phone || '',
+      RSVP: g.rsvpStatus,
+      Group: g.group,
+      'Plus Ones': g.plusOnes || 0,
+      'Dietary Notes': g.dietaryNotes || '',
+    }));
     downloadFile(objectsToCSV(data), `guests_${eventId}.csv`);
     toast.success('Guest list exported!');
   };
 
   const handleExportBudgetCSV = () => {
-    const data = categories.map(c => ({ Category: c.name, Estimated: c.estimatedCost, Actual: c.actualCost, Paid: c.amountPaid }));
+    const data = categories.map(c => ({
+      Category: c.name,
+      Estimated: c.estimatedCost,
+      Actual: c.actualCost,
+      Paid: c.amountPaid,
+    }));
     downloadFile(objectsToCSV(data), `budget_${eventId}.csv`);
     toast.success('Budget exported!');
   };
 
   const handleExportVendorCSV = () => {
-    const data = vendors.map(v => ({ Name: v.name, Category: v.category, Contact: v.contactName || '', Email: v.email || '', Phone: v.phone || '', Quote: v.estimatedQuote, Status: v.bookingStatus }));
+    const data = vendors.map(v => ({
+      Name: v.name,
+      Category: v.category,
+      Contact: v.contactName || '',
+      Email: v.email || '',
+      Phone: v.phone || '',
+      Quote: v.estimatedQuote,
+      Status: v.bookingStatus,
+    }));
     downloadFile(objectsToCSV(data), `vendors_${eventId}.csv`);
     toast.success('Vendor list exported!');
   };
 
-  if (loading || !event) {
-    return <AppLayout eventId={eventId} title="Export"><div className="page-content">{[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 80, borderRadius: 12, marginBottom: 12 }} />)}</div></AppLayout>;
+  if (loading) {
+    return (
+      <AppLayout eventId={eventId} title="Export">
+        <div className="page-content">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="skeleton" style={{ height: 80, borderRadius: 12, marginBottom: 12 }} />
+          ))}
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!event || (user && event.userId !== user.uid)) {
+    return (
+      <AppLayout title="Event Not Found">
+        <div className="page-content">
+          <div className="empty-state">
+            <h2 className="empty-state__title">Event not found</h2>
+            <p className="empty-state__desc">This event doesn't exist or you don't have access to it.</p>
+            <Link to="/dashboard" className="btn btn-primary"><ArrowLeft size={16} /> Back to Dashboard</Link>
+          </div>
+        </div>
+      </AppLayout>
+    );
   }
 
   return (

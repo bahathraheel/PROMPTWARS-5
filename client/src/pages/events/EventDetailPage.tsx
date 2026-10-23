@@ -1,31 +1,50 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
-  Calendar, DollarSign, Users, MapPin, Trash2,
+  Calendar, DollarSign, Users, MapPin, Trash2, Edit2,
   Bot, CheckSquare, ShoppingBag, Palette, FileText,
-  Clock, ArrowRight, Sparkles
+  Clock, ArrowRight, Sparkles, X, Check
 } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { useAuth } from '../../contexts/AuthContext';
-import { getEvent, deleteEvent } from '../../services/firestoreService';
-import type { Event } from '../../../../shared/types/index';
+import { getEvent, updateEvent, deleteEvent } from '../../services/firestoreService';
+import type { Event, PlanningStyle } from '../../../../shared/types/index';
 import { formatDate, formatCurrency, daysUntil, getEventTypeLabel, getStatusColor } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 
 export default function EventDetailPage() {
   const { eventId } = useParams<{ eventId: string }>();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState<Partial<Event>>({});
 
   useEffect(() => {
     if (!eventId) return;
-    getEvent(eventId).then(e => {
-      setEvent(e);
-      setLoading(false);
-    });
+    getEvent(eventId)
+      .then(e => {
+        setEvent(e);
+        if (e) {
+          setEditForm({
+            name: e.name,
+            date: e.date,
+            city: e.city,
+            guestCount: e.guestCount,
+            budget: e.budget,
+            theme: e.theme,
+            atmosphere: e.atmosphere,
+            planningStyle: e.planningStyle,
+          });
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load event:', err);
+        toast.error('Failed to load event');
+      })
+      .finally(() => setLoading(false));
   }, [eventId]);
 
   const handleDelete = async () => {
@@ -42,7 +61,34 @@ export default function EventDetailPage() {
     }
   };
 
-  if (loading) {
+  const handleSaveEdit = async () => {
+    if (!event || !editForm.name?.trim()) {
+      toast.error('Event name is required');
+      return;
+    }
+    try {
+      const updatedFields: Partial<Event> = {
+        name: editForm.name.trim(),
+        date: editForm.date || event.date,
+        city: editForm.city?.trim() || '',
+        guestCount: Number(editForm.guestCount) || event.guestCount,
+        budget: Number(editForm.budget) || event.budget,
+        theme: editForm.theme?.trim() || '',
+        atmosphere: editForm.atmosphere?.trim() || '',
+        planningStyle: editForm.planningStyle as PlanningStyle,
+      };
+
+      await updateEvent(event.id, updatedFields);
+      setEvent(prev => prev ? { ...prev, ...updatedFields } : null);
+      setEditing(false);
+      toast.success('Event details updated!');
+    } catch (err) {
+      console.error('Failed to update event:', err);
+      toast.error('Failed to update event');
+    }
+  };
+
+  if (loading || authLoading) {
     return (
       <AppLayout title="Event Details">
         <div className="page-content">
@@ -52,7 +98,7 @@ export default function EventDetailPage() {
     );
   }
 
-  if (!event || event.userId !== user?.uid) {
+  if (!event || (user && event.userId !== user.uid)) {
     return (
       <AppLayout title="Event Not Found">
         <div className="page-content">
@@ -115,6 +161,9 @@ export default function EventDetailPage() {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setEditing(true)} className="btn btn-secondary btn-sm" id="edit-event-btn">
+                <Edit2 size={14} /> Edit Event
+              </button>
               <button onClick={handleDelete} disabled={deleting} className="btn btn-danger btn-sm" aria-label="Delete event" id="delete-event-btn">
                 <Trash2 size={14} /> {deleting ? 'Deleting...' : 'Delete'}
               </button>
@@ -124,6 +173,115 @@ export default function EventDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Edit Event Modal */}
+        {editing && (
+          <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Edit Event Details">
+            <div className="modal" style={{ maxWidth: 560 }}>
+              <div className="modal-header">
+                <h2 style={{ fontWeight: 700, fontSize: '1rem' }}>Edit Event Details</h2>
+                <button onClick={() => setEditing(false)} className="btn btn-icon btn-ghost btn-sm" aria-label="Close modal">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div className="form-group">
+                  <label className="form-label">Event Name *</label>
+                  <input
+                    className="input"
+                    value={editForm.name || ''}
+                    onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                    id="edit-event-name"
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Date *</label>
+                    <input
+                      type="date"
+                      className="input"
+                      value={editForm.date || ''}
+                      onChange={e => setEditForm(p => ({ ...p, date: e.target.value }))}
+                      id="edit-event-date"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">City / Location</label>
+                    <input
+                      className="input"
+                      value={editForm.city || ''}
+                      onChange={e => setEditForm(p => ({ ...p, city: e.target.value }))}
+                      id="edit-event-city"
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Guest Count</label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="input"
+                      value={editForm.guestCount || ''}
+                      onChange={e => setEditForm(p => ({ ...p, guestCount: parseInt(e.target.value) || 0 }))}
+                      id="edit-event-guests"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Total Budget ({event.currency})</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="input"
+                      value={editForm.budget || ''}
+                      onChange={e => setEditForm(p => ({ ...p, budget: parseFloat(e.target.value) || 0 }))}
+                      id="edit-event-budget"
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Planning Style</label>
+                  <div className="select-wrapper">
+                    <select
+                      className="select"
+                      value={editForm.planningStyle}
+                      onChange={e => setEditForm(p => ({ ...p, planningStyle: e.target.value as PlanningStyle }))}
+                      id="edit-event-style"
+                    >
+                      <option value="budget_friendly">Budget Friendly</option>
+                      <option value="balanced">Balanced</option>
+                      <option value="premium">Premium</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Theme</label>
+                  <input
+                    className="input"
+                    value={editForm.theme || ''}
+                    onChange={e => setEditForm(p => ({ ...p, theme: e.target.value }))}
+                    id="edit-event-theme"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Atmosphere</label>
+                  <textarea
+                    className="textarea"
+                    value={editForm.atmosphere || ''}
+                    onChange={e => setEditForm(p => ({ ...p, atmosphere: e.target.value }))}
+                    id="edit-event-atmosphere"
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
+                  <button onClick={() => setEditing(false)} className="btn btn-ghost btn-sm">Cancel</button>
+                  <button onClick={handleSaveEdit} className="btn btn-primary btn-sm" id="save-event-edit-btn">
+                    <Check size={14} /> Save Changes
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Navigation Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>

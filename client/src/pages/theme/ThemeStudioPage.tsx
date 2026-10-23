@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { RefreshCw, Heart, Palette, Sparkles, AlertCircle } from 'lucide-react';
+import { useParams, Link } from 'react-router-dom';
+import { RefreshCw, Heart, Palette, Sparkles, AlertCircle, ArrowLeft } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { getEvent } from '../../services/firestoreService';
@@ -15,12 +15,18 @@ export default function ThemeStudioPage() {
   const [event, setEvent] = useState<Event | null>(null);
   const [themes, setThemes] = useState<ThemeSuggestions['themes']>([]);
   const [loading, setLoading] = useState(false);
+  const [eventLoading, setEventLoading] = useState(true);
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
   const [selectedTheme, setSelectedTheme] = useState<number | null>(null);
 
   useEffect(() => {
     if (!eventId || !user) return;
-    getEvent(eventId).then(setEvent);
+    getEvent(eventId)
+      .then(setEvent)
+      .catch((err) => {
+        console.error('Failed to load event:', err);
+      })
+      .finally(() => setEventLoading(false));
   }, [eventId, user]);
 
   const handleGenerate = async () => {
@@ -42,10 +48,36 @@ export default function ThemeStudioPage() {
   const toggleFavorite = (i: number) => {
     setFavorites(prev => {
       const next = new Set(prev);
-      next.has(i) ? next.delete(i) : next.add(i);
+      if (next.has(i)) { next.delete(i); } else { next.add(i); }
       return next;
     });
   };
+
+  if (eventLoading) {
+    return (
+      <AppLayout eventId={eventId} title="Theme Studio">
+        <div className="page-content">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="skeleton" style={{ height: 100, borderRadius: 12, marginBottom: 12 }} />
+          ))}
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!event || (user && event.userId !== user.uid)) {
+    return (
+      <AppLayout title="Event Not Found">
+        <div className="page-content">
+          <div className="empty-state">
+            <h2 className="empty-state__title">Event not found</h2>
+            <p className="empty-state__desc">This event doesn't exist or you don't have access to it.</p>
+            <Link to="/dashboard" className="btn btn-primary"><ArrowLeft size={16} /> Back to Dashboard</Link>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout eventId={eventId} title="Theme Studio">
@@ -53,7 +85,7 @@ export default function ThemeStudioPage() {
         <div className="section-header">
           <div>
             <h1 className="section-title">Theme Studio</h1>
-            <p className="section-subtitle">AI-generated theme and inspiration concepts</p>
+            <p className="section-subtitle">AI-generated theme and inspiration concepts for {event.name}</p>
           </div>
           <button onClick={handleGenerate} disabled={loading} className="btn btn-primary" id="generate-themes-btn">
             {loading ? <><div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> Generating...</> : <><Sparkles size={16} /> Generate Themes</>}

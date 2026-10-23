@@ -71,6 +71,7 @@ export interface Event {
   planningStyle: PlanningStyle;
   status: EventStatus;
   aiPlanId?: string;
+  aiPlan?: AIEventPlan;
   collaborators?: string[]; // user UIDs
   createdAt: string;
   updatedAt: string;

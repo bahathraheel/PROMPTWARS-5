@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Plus, Trash2, Search, Phone, Mail, Bot, X, Check } from 'lucide-react';
+import { useParams, Link } from 'react-router-dom';
+import { Plus, Trash2, Edit2, Search, Phone, Mail, Bot, X, Check, ArrowLeft } from 'lucide-react';
 import AppLayout from '../../components/layout/AppLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { getEvent, getVendors, addVendor, updateVendor, deleteVendor } from '../../services/firestoreService';
@@ -9,7 +9,9 @@ import type { Event, Vendor, VendorCategory, BookingStatus } from '../../../../s
 import { formatCurrency } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 
-const CATEGORIES: VendorCategory[] = ['venue', 'catering', 'decor', 'photography', 'makeup', 'entertainment', 'transportation', 'other'];
+const CATEGORIES: VendorCategory[] = [
+  'venue', 'catering', 'decor', 'photography', 'makeup', 'entertainment', 'transportation', 'other'
+];
 
 const BOOKING_COLORS: Record<BookingStatus, string> = {
   not_contacted: 'badge-neutral',
@@ -28,17 +30,23 @@ export default function VendorsPage() {
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState<string>('all');
   const [showAdd, setShowAdd] = useState(false);
+  const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [emailModal, setEmailModal] = useState<{ vendor: Vendor; draft?: { subject: string; body: string } } | null>(null);
   const [draftingEmail, setDraftingEmail] = useState(false);
   const [newVendor, setNewVendor] = useState<Partial<Vendor>>({ category: 'venue', bookingStatus: 'not_contacted', estimatedQuote: 0 });
 
   useEffect(() => {
     if (!eventId || !user) return;
-    Promise.all([getEvent(eventId), getVendors(eventId)]).then(([ev, vs]) => {
-      setEvent(ev);
-      setVendors(vs);
-      setLoading(false);
-    });
+    Promise.all([getEvent(eventId), getVendors(eventId)])
+      .then(([ev, vs]) => {
+        setEvent(ev);
+        setVendors(vs);
+      })
+      .catch((err) => {
+        console.error('Failed to load vendors:', err);
+        toast.error('Failed to load vendor data');
+      })
+      .finally(() => setLoading(false));
   }, [eventId, user]);
 
   const filtered = vendors.filter(v => {
@@ -48,33 +56,31 @@ export default function VendorsPage() {
   });
 
   const handleAdd = async () => {
-    if (!newVendor.name || !eventId || !user) return;
+    if (!newVendor.name?.trim() || !eventId || !user) {
+      toast.error('Please enter a vendor name.');
+      return;
+    }
     try {
-      const id = await addVendor({
-        eventId, userId: user.uid,
-        name: newVendor.name || '',
-        category: newVendor.category as VendorCategory || 'other',
-        contactName: newVendor.contactName,
-        email: newVendor.email,
-        phone: newVendor.phone,
-        website: newVendor.website,
-        location: newVendor.location,
-        estimatedQuote: newVendor.estimatedQuote || 0,
-        bookingStatus: newVendor.bookingStatus as BookingStatus || 'not_contacted',
-        notes: newVendor.notes,
+      const payload = {
+        eventId,
+        userId: user.uid,
+        name: newVendor.name.trim(),
+        category: (newVendor.category as VendorCategory) || 'other',
+        contactName: newVendor.contactName?.trim() || undefined,
+        email: newVendor.email?.trim() || undefined,
+        phone: newVendor.phone?.trim() || undefined,
+        website: newVendor.website?.trim() || undefined,
+        location: newVendor.location?.trim() || undefined,
+        estimatedQuote: Number(newVendor.estimatedQuote) || 0,
+        bookingStatus: (newVendor.bookingStatus as BookingStatus) || 'not_contacted',
+        notes: newVendor.notes?.trim() || undefined,
         isAiSuggested: false,
-      });
+      };
+
+      const id = await addVendor(payload);
       const vendor: Vendor = {
-        id, eventId, userId: user.uid,
-        name: newVendor.name || '',
-        category: newVendor.category as VendorCategory || 'other',
-        contactName: newVendor.contactName,
-        email: newVendor.email,
-        phone: newVendor.phone,
-        estimatedQuote: newVendor.estimatedQuote || 0,
-        bookingStatus: newVendor.bookingStatus as BookingStatus || 'not_contacted',
-        notes: newVendor.notes,
-        isAiSuggested: false,
+        ...payload,
+        id,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -82,7 +88,38 @@ export default function VendorsPage() {
       setNewVendor({ category: 'venue', bookingStatus: 'not_contacted', estimatedQuote: 0 });
       setShowAdd(false);
       toast.success('Vendor added!');
-    } catch { toast.error('Failed to add vendor.'); }
+    } catch (err) {
+      console.error('Failed to add vendor:', err);
+      toast.error('Failed to add vendor.');
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingVendor || !editingVendor.name?.trim()) {
+      toast.error('Vendor name is required.');
+      return;
+    }
+    try {
+      const updatedFields: Partial<Vendor> = {
+        name: editingVendor.name.trim(),
+        category: editingVendor.category,
+        contactName: editingVendor.contactName?.trim() || undefined,
+        email: editingVendor.email?.trim() || undefined,
+        phone: editingVendor.phone?.trim() || undefined,
+        website: editingVendor.website?.trim() || undefined,
+        location: editingVendor.location?.trim() || undefined,
+        estimatedQuote: Number(editingVendor.estimatedQuote) || 0,
+        bookingStatus: editingVendor.bookingStatus,
+        notes: editingVendor.notes?.trim() || undefined,
+      };
+      await updateVendor(editingVendor.id, updatedFields);
+      setVendors(prev => prev.map(v => v.id === editingVendor.id ? { ...v, ...updatedFields } : v));
+      setEditingVendor(null);
+      toast.success('Vendor details updated!');
+    } catch (err) {
+      console.error('Failed to update vendor:', err);
+      toast.error('Failed to update vendor.');
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -91,14 +128,21 @@ export default function VendorsPage() {
       await deleteVendor(id);
       setVendors(prev => prev.filter(v => v.id !== id));
       toast.success('Vendor removed.');
-    } catch { toast.error('Failed to remove vendor.'); }
+    } catch (err) {
+      console.error('Failed to remove vendor:', err);
+      toast.error('Failed to remove vendor.');
+    }
   };
 
   const handleStatusChange = async (vendor: Vendor, status: BookingStatus) => {
     try {
       await updateVendor(vendor.id, { bookingStatus: status });
       setVendors(prev => prev.map(v => v.id === vendor.id ? { ...v, bookingStatus: status } : v));
-    } catch { toast.error('Failed to update status.'); }
+      toast.success('Status updated');
+    } catch (err) {
+      console.error('Failed to update status:', err);
+      toast.error('Failed to update status.');
+    }
   };
 
   const handleDraftEmail = async (vendor: Vendor) => {
@@ -125,7 +169,29 @@ export default function VendorsPage() {
   } as Record<VendorCategory, string>)[cat] ?? '📦';
 
   if (loading) {
-    return <AppLayout eventId={eventId} title="Vendors"><div className="page-content">{[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 80, borderRadius: 12, marginBottom: 12 }} />)}</div></AppLayout>;
+    return (
+      <AppLayout eventId={eventId} title="Vendors">
+        <div className="page-content">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="skeleton" style={{ height: 80, borderRadius: 12, marginBottom: 12 }} />
+          ))}
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!event || (user && event.userId !== user.uid)) {
+    return (
+      <AppLayout title="Event Not Found">
+        <div className="page-content">
+          <div className="empty-state">
+            <h2 className="empty-state__title">Event not found</h2>
+            <p className="empty-state__desc">This event doesn't exist or you don't have access to it.</p>
+            <Link to="/dashboard" className="btn btn-primary"><ArrowLeft size={16} /> Back to Dashboard</Link>
+          </div>
+        </div>
+      </AppLayout>
+    );
   }
 
   return (
@@ -170,7 +236,11 @@ export default function VendorsPage() {
               ].map(f => (
                 <div key={f.key} className="form-group" style={{ gap: 4 }}>
                   <label className="form-label" style={{ fontSize: '0.7rem' }}>{f.label}</label>
-                  <input id={f.id} className="input" type={f.type} placeholder={f.placeholder}
+                  <input
+                    id={f.id}
+                    className="input"
+                    type={f.type}
+                    placeholder={f.placeholder}
                     value={f.key === 'estimatedQuote' ? (newVendor[f.key as keyof Vendor] as number || '') : (newVendor[f.key as keyof Vendor] as string || '')}
                     onChange={e => setNewVendor((p: Partial<Vendor>) => ({ ...p, [f.key]: f.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value }))}
                   />
@@ -179,7 +249,12 @@ export default function VendorsPage() {
               <div className="form-group" style={{ gap: 4 }}>
                 <label className="form-label" style={{ fontSize: '0.7rem' }}>Category</label>
                 <div className="select-wrapper">
-                  <select className="select" value={newVendor.category} onChange={e => setNewVendor((p: Partial<Vendor>) => ({ ...p, category: e.target.value as VendorCategory }))} id="new-vendor-cat">
+                  <select
+                    className="select"
+                    value={newVendor.category || 'venue'}
+                    onChange={e => setNewVendor((p: Partial<Vendor>) => ({ ...p, category: e.target.value as VendorCategory }))}
+                    id="new-vendor-cat"
+                  >
                     {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
@@ -192,6 +267,133 @@ export default function VendorsPage() {
             <div style={{ display: 'flex', gap: 8, marginTop: '1rem' }}>
               <button onClick={handleAdd} className="btn btn-primary btn-sm" id="save-vendor-btn"><Check size={14} /> Save Vendor</button>
               <button onClick={() => setShowAdd(false)} className="btn btn-ghost btn-sm"><X size={14} /> Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Vendor Modal */}
+        {editingVendor && (
+          <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Edit Vendor">
+            <div className="modal" style={{ maxWidth: 560 }}>
+              <div className="modal-header">
+                <h2 style={{ fontWeight: 700, fontSize: '1rem' }}>Edit Vendor: {editingVendor.name}</h2>
+                <button onClick={() => setEditingVendor(null)} className="btn btn-icon btn-ghost btn-sm" aria-label="Close modal">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Vendor Name *</label>
+                    <input
+                      className="input"
+                      value={editingVendor.name}
+                      onChange={e => setEditingVendor(prev => prev ? { ...prev, name: e.target.value } : null)}
+                      id="edit-vendor-name"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Category</label>
+                    <div className="select-wrapper">
+                      <select
+                        className="select"
+                        value={editingVendor.category}
+                        onChange={e => setEditingVendor(prev => prev ? { ...prev, category: e.target.value as VendorCategory } : null)}
+                        id="edit-vendor-cat"
+                      >
+                        {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Contact Person</label>
+                    <input
+                      className="input"
+                      value={editingVendor.contactName || ''}
+                      onChange={e => setEditingVendor(prev => prev ? { ...prev, contactName: e.target.value } : null)}
+                      id="edit-vendor-contact"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Estimated Quote ({event?.currency})</label>
+                    <input
+                      className="input"
+                      type="number"
+                      value={editingVendor.estimatedQuote || ''}
+                      onChange={e => setEditingVendor(prev => prev ? { ...prev, estimatedQuote: parseFloat(e.target.value) || 0 } : null)}
+                      id="edit-vendor-quote"
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Email</label>
+                    <input
+                      className="input"
+                      type="email"
+                      value={editingVendor.email || ''}
+                      onChange={e => setEditingVendor(prev => prev ? { ...prev, email: e.target.value } : null)}
+                      id="edit-vendor-email"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Phone</label>
+                    <input
+                      className="input"
+                      type="tel"
+                      value={editingVendor.phone || ''}
+                      onChange={e => setEditingVendor(prev => prev ? { ...prev, phone: e.target.value } : null)}
+                      id="edit-vendor-phone"
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Booking Status</label>
+                    <div className="select-wrapper">
+                      <select
+                        className="select"
+                        value={editingVendor.bookingStatus}
+                        onChange={e => setEditingVendor(prev => prev ? { ...prev, bookingStatus: e.target.value as BookingStatus } : null)}
+                        id="edit-vendor-status"
+                      >
+                        {Object.keys(BOOKING_COLORS).map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Location / Address</label>
+                    <input
+                      className="input"
+                      value={editingVendor.location || ''}
+                      onChange={e => setEditingVendor(prev => prev ? { ...prev, location: e.target.value } : null)}
+                      id="edit-vendor-location"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Notes</label>
+                  <input
+                    className="input"
+                    value={editingVendor.notes || ''}
+                    onChange={e => setEditingVendor(prev => prev ? { ...prev, notes: e.target.value } : null)}
+                    id="edit-vendor-notes"
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
+                  <button onClick={() => setEditingVendor(null)} className="btn btn-ghost btn-sm">Cancel</button>
+                  <button onClick={handleSaveEdit} className="btn btn-primary btn-sm" id="save-edit-vendor-btn">
+                    <Check size={14} /> Save Changes
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -223,9 +425,26 @@ export default function VendorsPage() {
                       </div>
                     </div>
                   </div>
-                  <button onClick={() => handleDelete(vendor.id)} className="btn btn-icon btn-ghost btn-sm" aria-label="Remove vendor" id={`delete-vendor-${vendor.id}`}>
-                    <Trash2 size={14} />
-                  </button>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button
+                      onClick={() => setEditingVendor(vendor)}
+                      className="btn btn-icon btn-ghost btn-sm"
+                      aria-label={`Edit ${vendor.name}`}
+                      id={`edit-vendor-${vendor.id}`}
+                      title="Edit Vendor"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(vendor.id)}
+                      className="btn btn-icon btn-ghost btn-sm"
+                      aria-label="Remove vendor"
+                      id={`delete-vendor-${vendor.id}`}
+                      title="Delete Vendor"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Contact info */}
@@ -253,9 +472,14 @@ export default function VendorsPage() {
                 {/* Actions */}
                 <div style={{ display: 'flex', gap: 8 }}>
                   <div className="select-wrapper" style={{ flex: 1 }}>
-                    <select className="select" style={{ fontSize: '0.75rem', padding: '0.375rem 2rem 0.375rem 0.75rem' }}
-                      value={vendor.bookingStatus} onChange={e => handleStatusChange(vendor, e.target.value as BookingStatus)}
-                      aria-label="Update booking status" id={`vendor-status-${vendor.id}`}>
+                    <select
+                      className="select"
+                      style={{ fontSize: '0.75rem', padding: '0.375rem 2rem 0.375rem 0.75rem' }}
+                      value={vendor.bookingStatus}
+                      onChange={e => handleStatusChange(vendor, e.target.value as BookingStatus)}
+                      aria-label="Update booking status"
+                      id={`vendor-status-${vendor.id}`}
+                    >
                       {Object.keys(BOOKING_COLORS).map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
                     </select>
                   </div>
