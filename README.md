@@ -9,7 +9,7 @@ Planen AI is an intelligent full-stack event planning web application that trans
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 **Live Application:** [promptwars-5-client.vercel.app](https://promptwars-5-client.vercel.app/) *(Production deployment: [planen-ai.vercel.app](https://planen-ai.vercel.app/))*  
-**Backend API:** [planen-ai1.onrender.com](https://planen-ai1.onrender.com)
+
 
 ---
 
